@@ -56,6 +56,28 @@ class Decoder(nn.Module):
         # NOTE: Use nn.RNN and nn.LSTM instead of the naive implementation          #
         #############################################################################
 
+        # 1) Embedding layer
+        self.embedding = nn.Embedding(output_size, emb_size)
+        
+        # 2) Recurrent layer based on model_type
+        if model_type == "RNN":
+            self.rnn = nn.RNN(emb_size, decoder_hidden_size, batch_first=False)
+        elif model_type == "LSTM":
+            self.rnn = nn.LSTM(emb_size, decoder_hidden_size, batch_first=False)
+        else:
+            raise ValueError(f"Unsupported model_type: {model_type}")
+        
+        # 3) Linear layer for output with log softmax
+        self.out = nn.Linear(decoder_hidden_size, output_size)
+        self.log_softmax = nn.LogSoftmax(dim=1)
+        
+        # 4) Dropout layer
+        self.dropout = nn.Dropout(dropout)
+        
+        # 5) Linear layer for attention (to downsize concatenation of context and input)
+        if attention:
+            self.attention_linear = nn.Linear(encoder_hidden_size + emb_size, emb_size)
+
         #############################################################################
         #                              END OF YOUR CODE                             #
         #############################################################################
@@ -84,7 +106,31 @@ class Decoder(nn.Module):
         # some other similar function for your implementation.                      #
         #############################################################################
 
-        attention_prob = None   #remove this line when you start implementing your code
+        # hidden: (1, N, hidden_dim)
+        # encoder_outputs: (N, T, hidden_dim)
+        
+        # Remove the sequence dimension from hidden: (1, N, hidden_dim) -> (N, hidden_dim)
+        hidden = hidden.squeeze(0)  # (N, hidden_dim)
+        
+        # Compute q @ K^T
+        # hidden: (N, hidden_dim), encoder_outputs: (N, T, hidden_dim)
+        # We need to compute dot product: (N, hidden_dim) @ (N, hidden_dim, T) -> (N, T)
+        scores = torch.bmm(hidden.unsqueeze(1), encoder_outputs.transpose(1, 2))  # (N, 1, T)
+        
+        # Compute magnitudes
+        # |q|: (N, 1)
+        q_norm = torch.norm(hidden, dim=1, keepdim=True)  # (N, 1)
+        
+        # |K|: (N, T)
+        k_norm = torch.norm(encoder_outputs, dim=2)  # (N, T)
+        
+        # Compute cosine similarity: scores / (|q| * |K|)
+        # Expand q_norm to match dimensions: (N, 1) -> (N, 1, 1) then broadcast
+        cosine_sim = scores / (q_norm.unsqueeze(2) * k_norm.unsqueeze(1) + 1e-8)  # (N, 1, T)
+        
+        # Apply softmax to get attention probabilities
+        attention_prob = torch.softmax(cosine_sim, dim=2)  # (N, 1, T)
+        
         #############################################################################
         #                              END OF YOUR CODE                             #
         #############################################################################
@@ -123,7 +169,48 @@ class Decoder(nn.Module):
         #       containing both the hidden state and the cell state of the LSTM.    #
         #############################################################################
 
-        output, hidden = None, None     #remove this line when you start implementing your code
+        # input: (N, 1)
+        # 1) Embed the input and apply dropout
+        embedded = self.embedding(input)  # (N, 1, emb_size)
+        embedded = self.dropout(embedded)
+        
+        # 2) Handle attention if enabled
+        if self.attention and encoder_outputs is not None:
+            # Get the hidden state for attention computation
+            # For LSTM, hidden is a tuple (h, c), we use h for attention
+            if self.model_type == "LSTM":
+                h_state = hidden[0]  # (1, N, decoder_hidden_size)
+            else:
+                h_state = hidden  # (1, N, decoder_hidden_size)
+            
+            # Compute attention probabilities
+            attention_weights = self.compute_attention(h_state, encoder_outputs)  # (N, 1, T)
+            
+            # Compute context vector as weighted sum of encoder outputs
+            # attention_weights: (N, 1, T), encoder_outputs: (N, T, encoder_hidden_size)
+            context = torch.bmm(attention_weights, encoder_outputs)  # (N, 1, encoder_hidden_size)
+            
+            # Concatenate context with embedded input
+            # embedded: (N, 1, emb_size), context: (N, 1, encoder_hidden_size)
+            combined = torch.cat((context, embedded), dim=2)  # (N, 1, encoder_hidden_size + emb_size)
+            
+            # Pass through linear layer to downsize to emb_size
+            rnn_input = self.attention_linear(combined)  # (N, 1, emb_size)
+        else:
+            rnn_input = embedded  # (N, 1, emb_size)
+        
+        # Reshape for RNN: (seq_len=1, N, emb_size)
+        rnn_input = rnn_input.transpose(0, 1)  # (1, N, emb_size)
+        
+        # Pass through RNN/LSTM
+        rnn_output, hidden = self.rnn(rnn_input, hidden)  # rnn_output: (1, N, decoder_hidden_size)
+        
+        # Reshape back: (1, N, decoder_hidden_size) -> (N, decoder_hidden_size)
+        rnn_output = rnn_output.squeeze(0)  # (N, decoder_hidden_size)
+        
+        # 3) Apply linear layer and log-softmax
+        output = self.out(rnn_output)  # (N, output_size)
+        output = self.log_softmax(output)  # (N, output_size)
 
         #############################################################################
         #                              END OF YOUR CODE                             #
