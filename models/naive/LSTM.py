@@ -107,11 +107,11 @@ class LSTM(nn.Module):
         #   h_t and c_t should be initialized to zeros.                                #
         #   Note that this time you are also iterating over all of the time steps.     #
         ################################################################################
-        batch_size, seq_len, _ = x.size()
+        batch_size, seq_length, _ = x.size()
         h_t = torch.zeros(batch_size, self.hidden_size, device=x.device)
         c_t = torch.zeros(batch_size, self.hidden_size, device=x.device)
 
-        for t in range(seq_len):
+        for t in range(seq_length):
             x_t = x[:, t, :]
 
             i_t = self.sigmoid(x_t @ self.W_ii + self.b_ii + h_t @ self.W_hi + self.b_hi)
