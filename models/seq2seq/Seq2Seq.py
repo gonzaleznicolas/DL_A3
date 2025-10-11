@@ -45,6 +45,9 @@ class Seq2Seq(nn.Module):
         #    more than 2 lines of code.                                             #
         #############################################################################
 
+        self.encoder = encoder.to(device)
+        self.decoder = decoder.to(device)
+
         #############################################################################
         #                              END OF YOUR CODE                             #
         #############################################################################
@@ -74,8 +77,30 @@ class Seq2Seq(nn.Module):
         #          input at the next time step.                                     #
         #############################################################################
 
-        outputs = None      #remove this line when you start implementing your code
-        # initially set outputs as a tensor of zeros with dimensions (batch_size, seq_len, decoder_output_size)
+        # 1) Get the last hidden representation from the encoder
+        encoder_outputs, hidden = self.encoder(source)
+        
+        # Initialize outputs tensor with zeros (batch_size, seq_len, decoder_output_size)
+        outputs = torch.zeros(batch_size, seq_len, self.decoder.output_size).to(self.device)
+        
+        # 2) The first input for the decoder is the <sos> token (first token in source)
+        decoder_input = source[:, 0].unsqueeze(1)  # (batch_size, 1)
+        
+        # 3) & 4) Feed through decoder one step at a time
+        for t in range(seq_len):
+            # Feed input and hidden state into decoder
+            if self.decoder.attention:
+                output, hidden = self.decoder(decoder_input, hidden, encoder_outputs)
+            else:
+                output, hidden = self.decoder(decoder_input, hidden)
+            
+            # Store output in outputs tensor
+            outputs[:, t, :] = output
+            
+            # 4) Update decoder input for next time step
+            # Get the index of the most likely next token
+            top1 = output.argmax(1)  # (batch_size,)
+            decoder_input = top1.unsqueeze(1)  # (batch_size, 1)
 
         #############################################################################
         #                              END OF YOUR CODE                             #
