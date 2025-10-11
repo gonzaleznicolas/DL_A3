@@ -11,4 +11,5 @@ dependencies:
   - pip:
     - notebook
     - numpy
+    - pandas
 

@@ -57,7 +57,24 @@ class Encoder(nn.Module):
         #                                                                           #
         # NOTE: Use nn.RNN and nn.LSTM instead of the naive implementation          #
         #############################################################################
+        
+        # 1) An embedding layer
+        self.embedding = nn.Embedding(input_size, emb_size)
 
+        # 2) A recurrent layer
+        if model_type == "RNN":
+            self.rnn = nn.RNN(emb_size, encoder_hidden_size, batch_first=True)
+        elif model_type == "LSTM":
+            self.rnn = nn.LSTM(emb_size, encoder_hidden_size, batch_first=True)
+        
+        # 3) Linear layers with ReLU activation
+        self.linear1 = nn.Linear(encoder_hidden_size, encoder_hidden_size)
+        self.relu = nn.ReLU()
+        self.linear2 = nn.Linear(encoder_hidden_size, decoder_hidden_size)
+        
+        # 4) A dropout layer
+        self.dropout = nn.Dropout(dropout)
+        
         #############################################################################
         #                              END OF YOUR CODE                             #
         #############################################################################
@@ -86,7 +103,25 @@ class Encoder(nn.Module):
         #       containing both the hidden state and the cell state of the LSTM.    #
         #############################################################################
 
-        output, hidden = None, None     #remove this line when you start implementing your code
+        embedded = self.embedding(input)
+        embedded_with_dropout = self.dropout(embedded)
+        output, potential_tuple = self.rnn(embedded_with_dropout)
+        
+        hidden = None
+        if self.model_type == "RNN":
+            h_n = potential_tuple  # For RNN, potential_tuple is just the hidden state
+            temp = self.linear1(h_n)
+            temp = self.relu(temp)
+            temp = self.linear2(temp)
+            hidden = torch.tanh(temp)
+        else:  # LSTM
+            # For LSTM, hidden_states is a tuple (hidden state, cell state)
+            h_n, c_n = potential_tuple
+            temp = self.linear1(h_n)
+            temp = self.relu(temp)
+            temp = self.linear2(temp)
+            temp = torch.tanh(temp)
+            hidden = (temp, c_n)
 
         #############################################################################
         #                              END OF YOUR CODE                             #
