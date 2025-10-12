@@ -105,33 +105,38 @@ class Encoder(nn.Module):
         #       containing both the hidden state and the cell state of the LSTM.    #
         #############################################################################
 
-        # Apply embedding and dropout
-        embedded = self.dropout(self.embedding(input))
+        # Apply embedding
+        embedded = self.embedding(input)
+
+        # Dropped out
+        dropped_out = self.dropout(embedded)
         
         # Pass through RNN/LSTM
-        output, hidden_states = self.rnn(embedded)
+        output, potential_tuple = self.rnn(dropped_out)
         
         # Process hidden states based on model type
         if self.model_type == "RNN":
+            h_n = potential_tuple  # For RNN, hidden_states is just the hidden state
+
             # Apply linear layers to hidden state
-            hidden = self.linear1(hidden_states)
-            hidden = self.relu(hidden)
-            hidden = self.linear2(hidden)
+            temp = self.linear1(h_n)
+            temp = self.relu(temp)
+            temp = self.linear2(temp)
             # Apply tanh activation
-            hidden = torch.tanh(hidden)
+            hidden = torch.tanh(temp)
         else:  # LSTM
             # For LSTM, hidden_states is a tuple (hidden_state, cell_state)
-            hidden_state, cell_state = hidden_states
+            h_n, c_n = potential_tuple
             
             # Apply linear layers only to hidden state
-            processed_hidden = self.linear1(hidden_state)
-            processed_hidden = self.relu(processed_hidden)
-            processed_hidden = self.linear2(processed_hidden)
+            temp = self.linear1(h_n)
+            temp = self.relu(temp)
+            temp = self.linear2(temp)
             # Apply tanh activation
-            processed_hidden = torch.tanh(processed_hidden)
+            temp = torch.tanh(temp)
             
             # Return tuple with processed hidden state and untouched cell state
-            hidden = (processed_hidden, cell_state)
+            hidden = (temp, c_n)
 
         #############################################################################
         #                              END OF YOUR CODE                             #
