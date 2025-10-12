@@ -170,9 +170,11 @@ class Decoder(nn.Module):
         #############################################################################
 
         # input: (N, 1)
-        # 1) Embed the input and apply dropout
+        # 1a) Embed the input
         embedded = self.embedding(input)  # (N, 1, emb_size)
-        embedded = self.dropout(embedded)
+
+        # 1b) Apply dropout
+        dropped_out_embedded = self.dropout(embedded) # (N, 1, emb_size)
         
         # 2) Handle attention if enabled
         if self.attention and encoder_outputs is not None:
@@ -190,14 +192,14 @@ class Decoder(nn.Module):
             # attention_weights: (N, 1, T), encoder_outputs: (N, T, encoder_hidden_size)
             context = torch.bmm(attention_weights, encoder_outputs)  # (N, 1, encoder_hidden_size)
             
-            # Concatenate context with embedded input
-            # embedded: (N, 1, emb_size), context: (N, 1, encoder_hidden_size)
-            combined = torch.cat((context, embedded), dim=2)  # (N, 1, encoder_hidden_size + emb_size)
+            # Concatenate context with dropped_out_embedded input
+            # dropped_out_embedded: (N, 1, emb_size), context: (N, 1, encoder_hidden_size)
+            combined = torch.cat((context, dropped_out_embedded), dim=2)  # (N, 1, encoder_hidden_size + emb_size)
             
             # Pass through linear layer to downsize to emb_size
             rnn_input = self.attention_linear(combined)  # (N, 1, emb_size)
         else:
-            rnn_input = embedded  # (N, 1, emb_size)
+            rnn_input = dropped_out_embedded  # (N, 1, emb_size)
         
         # Reshape for RNN: (seq_len=1, N, emb_size)
         rnn_input = rnn_input.transpose(0, 1)  # (1, N, emb_size)
