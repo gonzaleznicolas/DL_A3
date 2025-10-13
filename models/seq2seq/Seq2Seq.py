@@ -99,8 +99,8 @@ class Seq2Seq(nn.Module):
             
             # 4) Update decoder input for next time step
             # Get the index of the most likely next token
-            top1 = output.argmax(1)  # (batch_size,)
-            decoder_input = top1.unsqueeze(1)  # (batch_size, 1)
+            most_likely_next_token = output.argmax(1)  # (batch_size,)
+            decoder_input = most_likely_next_token.unsqueeze(1)  # (batch_size, 1)
 
         #############################################################################
         #                              END OF YOUR CODE                             #
