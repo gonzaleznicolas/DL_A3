@@ -47,6 +47,7 @@ class TransformerTranslator(nn.Module):
         :param dim_k: the dimensionality of the key vectors
         :param dim_q: the dimensionality of the query vectors
         :param dim_v: the dimensionality of the value vectors
+        :param max_length: the maximum length of the input sequences
         """
         super(TransformerTranslator, self).__init__()
         assert hidden_dim % num_heads == 0
@@ -158,8 +159,8 @@ class TransformerTranslator(nn.Module):
     
     def embed(self, inputs):
         """
-        :param inputs: intTensor of shape (N,T)
-        :returns embeddings: floatTensor of shape (N,T,H)
+        :param inputs: intTensor of shape (N,T). (N=batch size, T=sequence length)
+        :returns embeddings: floatTensor of shape (N,T,H). (N=batch size, T=sequence length, H=hidden_dim)
         """
         #############################################################################
         # TODO:                                                                     #
@@ -167,7 +168,7 @@ class TransformerTranslator(nn.Module):
         # This will take a few lines.                                               #
         #############################################################################
         N, T = inputs.shape
-        # Get word embeddings
+        # Get word embeddings (this is just a lookup operation)
         word_embed = self.embeddingL(inputs)  # (N, T, H)
         
         # Create position indices and get positional embeddings
