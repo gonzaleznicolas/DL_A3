@@ -70,7 +70,7 @@ class TransformerTranslator(nn.Module):
         # TODO:
         # Deliverable 1: Initialize what you need for the embedding lookup.          #
         # You will need to use the max_length parameter above.                       #
-        # Don't worry about sine/cosine encodings- use positional encodings.         #
+        # Don’t worry about sine/cosine encodings- use positional encodings.         #
         ##############################################################################
         self.embeddingL = nn.Embedding(input_size, hidden_dim)      #initialize word embedding layer
         self.posembeddingL = nn.Embedding(max_length, hidden_dim)   #initialize positional embedding layer
